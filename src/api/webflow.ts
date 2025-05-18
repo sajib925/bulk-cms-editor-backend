@@ -1,4 +1,3 @@
-// import webflowController from "@/controllers/webflow";
 import { webflowController } from "@/controllers/webflow";
 import express from "express";
 import { WebflowClient } from "webflow-api";

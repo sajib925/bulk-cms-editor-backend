@@ -119,7 +119,6 @@ class WebflowApiClient {
     getCmsCollections = async(siteId:string)=>{
         try {
             const collections = await this.client.collections.list(siteId)
-            // console.log("from client api",collections);
             return collections.collections;
         } catch (e) {
             if (e instanceof Webflow.NotFoundError) return []
@@ -219,44 +218,38 @@ class WebflowApiClient {
 
     }
 
-    createCollectionItem = async (
+    createCollectionItems = async (
         collection_id: string,
-        fieldData: { name: string; slug: string; }
+        // items: Array<{ fields: Record<string, any> }>
+        items: Array<{ fields: { name: string; slug: string; [key: string]: any } }>
+
     ) => {
         try {
-            const collections = await this.client.collections.items.createItems(collection_id, {
-                fieldData: fieldData
-            });
+            const createdItems = [];
 
-            console.log("Collection created:", collections);
-            return collections;
+            for (const item of items) {
+                const collection = await this.client.collections.items.createItem(collection_id, {
+                    fieldData: item.fields
+                });
+                createdItems.push(collection);
+            }
+
+            console.log("Collections created:", createdItems);
+            return createdItems;
         } catch (e) {
-            console.error("Error creating collection:", e);
+            console.error("Error creating collections:", e);
             if (e instanceof Webflow.NotFoundError) return [];
+            throw e;
         }
     };
 
-    // updateCollectionItem = async (
-    //     collection_id: string,
-    //     item_id: string,
-    //     fieldData: { name: string; slug: string; }
-    // ) => {
-    //     try {
-    //         const collections = await this.client.collections.items.updateItem(collection_id as string, item_id , {
-    //             fieldData: fieldData
-    //         });
-    //
-    //         console.log("Collection Item Updated:", collections);
-    //         return collections;
-    //     } catch (e) {
-    //         console.error("Error Updating collection:", e);
-    //         if (e instanceof Webflow.NotFoundError) return [];
-    //     }
-    // };
+
+
+
     updateCollectionItem = async (
         collection_id: string,
         item_id: string,
-        fieldData: Record<string, any> // 👈 now accepts any dynamic fields
+        fieldData: Record<string, any>
     ) => {
         try {
             const collections = await this.client.collections.items.updateItem(
@@ -274,11 +267,72 @@ class WebflowApiClient {
     };
 
 
+    updateCollectionItems = async (
+        collection_id: string,
+        items: Array<{ _id: string; fields: Record<string, any> }>
+    ) => {
+        try {
+            console.log('Items to update:', items);
+
+            const formattedItems = items.map(({ _id, fields }, index) => {
+                if (!fields) {
+                    console.warn(`Item at index ${index} has missing fields data`);
+                    return {
+                        id: _id,
+                        fieldData: {},
+                    };
+                }
+
+                if (typeof fields !== 'object' || Array.isArray(fields)) {
+                    console.warn(`Item at index ${index} has invalid fieldData:`, fields);
+                    throw new Error(`Invalid fieldData for item at index ${index}`);
+                }
+
+                return {
+                    id: _id,
+                    fieldData: fields,
+                };
+            });
+
+            const response = await this.client.collections.items.updateItems(collection_id, {
+                items: formattedItems,
+            });
+
+            console.log("Bulk Collection Items Updated:", response);
+            return response;
+        } catch (e) {
+            console.error("Error updating collection items:", e);
+            if (e instanceof Webflow.NotFoundError) return [];
+            throw e;
+        }
+    };
+
+
+
     deleteCollectionItem = async(collection_id:string, item_id:string)=>{
         try {
             const collectionItem = await this.client.collections.items.deleteItem(collection_id, item_id)
             console.log("from client api",collectionItem);
             return collectionItem;
+        } catch (e) {
+            if (e instanceof Webflow.NotFoundError) return []
+        }
+    }
+
+
+    publishCollectionItem = async (collection_id: string, itemIds: string[]) => {
+        try {
+            const response = await this.client.collections.items.publishItem(collection_id, {
+                itemIds: itemIds
+            });
+            console.log("Publish Response:", response);
+
+            const { publishedItemIds, errors } = response;
+
+            return {
+                success: publishedItemIds || [],
+                errors: errors || []
+            };
         } catch (e) {
             if (e instanceof Webflow.NotFoundError) return []
         }
